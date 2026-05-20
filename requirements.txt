@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+requests
+cryptography
+PyQt6
+pydantic

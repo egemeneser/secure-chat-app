@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+*.pyc
+
+client/client_data/
+server/server_database.db
+
+.vscode/
+.DS_Store
