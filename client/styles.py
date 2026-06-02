@@ -155,6 +155,16 @@ def generate_stylesheet(colors):
         color: {colors["text_secondary"]};
     }}
 
+    QLabel#date_separator_label {{
+        background-color: {colors["bg_secondary"]};
+        color: {colors["text_secondary"]};
+        border: 1px solid {colors["border"]};
+        border-radius: 10px;
+        padding: 5px 12px;
+        font-size: 11px;
+        font-weight: bold;
+    }}
+
     /* ===== Line Edits ===== */
     QLineEdit {{
         background-color: {colors["bg_input"]};
@@ -466,6 +476,4 @@ class ThemeManager:
         else:
             return "Dark"
 
-
-# Global theme manager instance
 theme_manager = ThemeManager()

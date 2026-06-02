@@ -1,0 +1,58 @@
+{
+    "username": "cagan",
+    "identity_key_type": "ed25519",
+    "identity_private_key": "B06YafNLt/9IBikmZ9jjaj8iGAITVG7QjP8RO16BSmc=",
+    "identity_public_key": "H+Q3mtCEmibLbqdIvWMWvNXfsKcwouv8UPuLQ62k5Po=",
+    "signed_prekey_type": "x25519",
+    "signed_prekey_private_key": "aNU3zsvS1QHE+m+7MkfC+MEuJOqS8SGhKlqH6uJYHEc=",
+    "signed_prekey_public_key": "WSDt2ko6OugGGSx98zbbFB6QRVilJAL7y8Q4BDuMLzA=",
+    "signed_prekey_signature": "QwnNgAM2K6ocfc1Vl0LeTukrWTuLZkOwzI0PYq0hkxow7XbT4wyCBHRoLf9mNoUAalqcoJ4/WDzOimTXruqnBQ==",
+    "one_time_prekey_type": "x25519",
+    "one_time_prekeys": [
+        {
+            "id": "otk_27274e02-3618-49b1-ad01-24161e7e09ac",
+            "private_key": "SJI8ZRLtIhmnxgQ3WYIo6KdKyBUnOQGHxDTQkGW14n8=",
+            "public_key": "iNfe0F8Kq+qop2YaRFlbT3fatTSmHr0mMVS4FRiRLwI="
+        },
+        {
+            "id": "otk_9852befa-75a6-44c5-a8c8-ca4c46e306b9",
+            "private_key": "mC1RkmeqAJ53e58ySaTQf/NTMS7+ZgoS6c+r7uo1bkc=",
+            "public_key": "wr66bK+LWCcBbX87PhWjMaamxA+mwnAT+mxKssELnWI="
+        },
+        {
+            "id": "otk_f26df3e1-c8f0-4a8f-98af-0fbd6b265452",
+            "private_key": "8ICox0Kwiqa38+O9OtcULpPvFrkAlQrAJJ2Z22ke0VE=",
+            "public_key": "ijQIy/g55JBz+rSG5aQPCgZhvpIBl2kYqSB8WPxk+Uo="
+        },
+        {
+            "id": "otk_9ad84e6c-8e5c-40e9-b279-aa522bf1519a",
+            "private_key": "YP4Hd+PC8U6eodEZSBTPs16ARg833ugUbXc6HEHni0w=",
+            "public_key": "joEy5pS8+G0wK6mWyEHxgij6AAleKRiiG1tgoTEdN2E="
+        },
+        {
+            "id": "otk_cbf5c59d-f832-4ceb-ab63-924265cd4068",
+            "private_key": "0KV7Tc4JY6S/BGhnY8QPljQZK/sVO9sAQXcN0N8cVEo=",
+            "public_key": "DgeVR8fr9+R/vZ9fT4agpAUHU+zvuZLNxqrF7hCoylQ="
+        },
+        {
+            "id": "otk_8532d86b-748f-4b00-9157-0de248d2c2ea",
+            "private_key": "yLR0kVMBn5Jn2RqBu0yipdTAB2CydRNFG02ZtgeW2F4=",
+            "public_key": "jAau3GsDngHG6okSlelSfm7dOpl4/dAmlGEnvKJiIzo="
+        },
+        {
+            "id": "otk_88eabe9f-a0fd-48c6-bdd2-66a139faeeb2",
+            "private_key": "0LSusmYnnn6BNrxiH4f9Dhz3meP+B72VqjXFlX/aknE=",
+            "public_key": "0GuE6hDpgcLlqKzCQtLIwkU3+WD/wXLIlQXsDUWjIjQ="
+        },
+        {
+            "id": "otk_483e11c5-e703-4ac9-819c-63008af0dc76",
+            "private_key": "6J+atejw0wucqvijQTsqKaoHRquYbd/WECn1PPmKDEg=",
+            "public_key": "hqpcIjRApNm/vYsEMIs1KywcqpKIpQZ/GJDmeer2ZD4="
+        },
+        {
+            "id": "otk_5c3b8863-bc0e-46c6-b039-a46f39a1b00a",
+            "private_key": "AE25KvrRLZVo7sbkbeubHGqU0CvwdS0jwgl5jgXftHo=",
+            "public_key": "uMuY6SNBbD+Yrxlrt8xoEl4v4mRqudhVWNegTqRfJG8="
+        }
+    ]
+}

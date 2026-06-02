@@ -19,7 +19,6 @@ from styles import theme_manager
 
 
 class RegisterWindow(QWidget):
-    """Registration page. New users create their account here."""
 
     def __init__(self):
         super().__init__()
@@ -38,17 +37,19 @@ class RegisterWindow(QWidget):
         main_layout.setContentsMargins(40, 35, 40, 25)
         main_layout.setSpacing(0)
 
-        main_layout.addSpacerItem(
-            QSpacerItem(20, 30, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        spacer = QSpacerItem(
+            20,
+            30,
+            QSizePolicy.Policy.Minimum,
+            QSizePolicy.Policy.Fixed
         )
+        main_layout.addSpacerItem(spacer)
 
-        # Title
         title_label = QLabel("Create Account")
         title_label.setObjectName("title_label")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(title_label)
 
-        # Subtitle
         subtitle_label = QLabel("Join E2EE Messenger")
         subtitle_label.setObjectName("subtitle_label")
         subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -63,7 +64,6 @@ class RegisterWindow(QWidget):
 
         main_layout.addSpacing(24)
 
-        # Username
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("Choose a username")
         self.username_input.setMinimumHeight(42)
@@ -71,7 +71,6 @@ class RegisterWindow(QWidget):
 
         main_layout.addSpacing(10)
 
-        # Password
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("Choose a password")
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
@@ -80,7 +79,6 @@ class RegisterWindow(QWidget):
 
         main_layout.addSpacing(10)
 
-        # Confirm password
         self.confirm_password_input = QLineEdit()
         self.confirm_password_input.setPlaceholderText("Confirm password")
         self.confirm_password_input.setEchoMode(QLineEdit.EchoMode.Password)
@@ -90,7 +88,6 @@ class RegisterWindow(QWidget):
 
         main_layout.addSpacing(22)
 
-        # Register button
         self.register_button = QPushButton("Create Account")
         self.register_button.setObjectName("send_button")
         self.register_button.setMinimumHeight(42)
@@ -100,7 +97,6 @@ class RegisterWindow(QWidget):
 
         main_layout.addStretch()
 
-        # Link to login page
         switch_layout = QHBoxLayout()
 
         has_account_label = QLabel("Already have an account?")
@@ -115,12 +111,10 @@ class RegisterWindow(QWidget):
         switch_layout.addWidget(self.switch_button)
 
         switch_layout.addStretch()
-
         main_layout.addLayout(switch_layout)
 
         main_layout.addSpacing(8)
 
-        # Theme toggle
         footer_layout = QHBoxLayout()
 
         self.theme_button = QPushButton(theme_manager.get_toggle_icon())
@@ -131,7 +125,6 @@ class RegisterWindow(QWidget):
         footer_layout.addWidget(self.theme_button)
 
         footer_layout.addStretch()
-
         main_layout.addLayout(footer_layout)
 
         self.setLayout(main_layout)
@@ -146,19 +139,35 @@ class RegisterWindow(QWidget):
         confirm = self.confirm_password_input.text()
 
         if username == "" or password == "":
-            QMessageBox.warning(self, "Missing Information", "Please fill in all fields.")
+            QMessageBox.warning(
+                self,
+                "Missing Information",
+                "Please fill in all fields."
+            )
             return None, None
 
         if len(username) < 3:
-            QMessageBox.warning(self, "Invalid Username", "Username must be at least 3 characters.")
+            QMessageBox.warning(
+                self,
+                "Invalid Username",
+                "Username must be at least 3 characters."
+            )
             return None, None
 
         if len(password) < 4:
-            QMessageBox.warning(self, "Weak Password", "Password must be at least 4 characters.")
+            QMessageBox.warning(
+                self,
+                "Weak Password",
+                "Password must be at least 4 characters."
+            )
             return None, None
 
         if password != confirm:
-            QMessageBox.warning(self, "Password Mismatch", "Passwords do not match.")
+            QMessageBox.warning(
+                self,
+                "Password Mismatch",
+                "Passwords do not match."
+            )
             return None, None
 
         return username, password
@@ -173,10 +182,18 @@ class RegisterWindow(QWidget):
 
         if response["success"]:
             save_current_user(username)
-            QMessageBox.information(self, "Success", "Account created successfully.")
+            QMessageBox.information(
+                self,
+                "Success",
+                "Account created successfully."
+            )
             self.open_chat_window(username)
         else:
-            QMessageBox.warning(self, "Register Failed", response["message"])
+            QMessageBox.warning(
+                self,
+                "Register Failed",
+                response["message"]
+            )
 
     def open_chat_window(self, username):
         self.chat_window = ChatWindow(username)

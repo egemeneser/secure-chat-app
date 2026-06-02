@@ -7,7 +7,6 @@ from styles import theme_manager
 def main():
     app = QApplication(sys.argv)
 
-    # Initialize theme manager with the app
     theme_manager.set_app(app)
     theme_manager.apply_theme()
 

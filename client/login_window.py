@@ -19,8 +19,6 @@ from styles import theme_manager
 
 
 class LoginWindow(QWidget):
-    """Login page. Users who already have an account can sign in here."""
-
     def __init__(self):
         super().__init__()
 
@@ -42,13 +40,11 @@ class LoginWindow(QWidget):
             QSpacerItem(20, 30, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         )
 
-        # Title
         title_label = QLabel("Sign In")
         title_label.setObjectName("title_label")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(title_label)
 
-        # Subtitle
         subtitle_label = QLabel("Welcome back to E2EE Messenger")
         subtitle_label.setObjectName("subtitle_label")
         subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -63,7 +59,6 @@ class LoginWindow(QWidget):
 
         main_layout.addSpacing(24)
 
-        # Username
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("Username")
         self.username_input.setMinimumHeight(42)
@@ -71,7 +66,6 @@ class LoginWindow(QWidget):
 
         main_layout.addSpacing(10)
 
-        # Password
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("Password")
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
@@ -81,7 +75,6 @@ class LoginWindow(QWidget):
 
         main_layout.addSpacing(22)
 
-        # Sign In button
         self.login_button = QPushButton("Sign In")
         self.login_button.setObjectName("send_button")
         self.login_button.setMinimumHeight(42)
@@ -91,7 +84,6 @@ class LoginWindow(QWidget):
 
         main_layout.addStretch()
 
-        # Link to register page
         switch_layout = QHBoxLayout()
 
         no_account_label = QLabel("Don't have an account?")
@@ -111,7 +103,6 @@ class LoginWindow(QWidget):
 
         main_layout.addSpacing(8)
 
-        # Theme toggle
         footer_layout = QHBoxLayout()
 
         self.theme_button = QPushButton(theme_manager.get_toggle_icon())

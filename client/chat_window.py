@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date, timedelta
 
 from PyQt6.QtWidgets import (
     QWidget,
@@ -27,7 +27,8 @@ from storage import (
     load_session,
     save_session,
     save_message_to_history,
-    load_chat_history
+    load_chat_history,
+    load_existing_chat_contacts
 )
 
 from encryption import (
@@ -42,19 +43,13 @@ from encryption import (
 
 
 def truncate_key(key_string, length=16):
-    """Truncate a base64 key string for display."""
     if key_string is None or len(key_string) <= length:
         return key_string
+
     return key_string[:length] + "..."
 
 
 class SecurityInfoDialog(QDialog):
-    """
-    Dialog that displays encryption details for a conversation.
-    Shows identity keys, session keys, and encryption parameters
-    so the TA can verify E2EE is working correctly.
-    """
-
     def __init__(self, username, contact, api_client, parent=None):
         super().__init__(parent)
 
@@ -79,9 +74,6 @@ class SecurityInfoDialog(QDialog):
         lines.append("=" * 50)
         lines.append("")
 
-        # Local user key info
-        from storage import load_user_keys, load_session
-
         key_data = load_user_keys(username)
 
         if key_data is not None:
@@ -95,7 +87,6 @@ class SecurityInfoDialog(QDialog):
             lines.append("One-Time PreKeys:    " + str(otk_count) + " remaining")
             lines.append("")
 
-        # Contact key info from server
         if contact is not None:
             response = api_client.get_key_bundle_info(contact)
 
@@ -110,7 +101,6 @@ class SecurityInfoDialog(QDialog):
                 lines.append("One-Time PreKeys:    " + str(info.get("one_time_prekeys_remaining", 0)) + " remaining")
                 lines.append("")
 
-            # Session info
             session_data = load_session(username, contact)
 
             if session_data is not None:
@@ -144,11 +134,6 @@ class SecurityInfoDialog(QDialog):
 
 
 class MessageBubble(QFrame):
-    """
-    Custom widget for a single chat message bubble.
-    Sent messages are right-aligned, received messages are left-aligned.
-    """
-
     def __init__(self, message_text, sender_name, timestamp, is_sent=True, parent=None):
         super().__init__(parent)
 
@@ -163,13 +148,11 @@ class MessageBubble(QFrame):
         bubble_layout.setContentsMargins(12, 8, 12, 6)
         bubble_layout.setSpacing(2)
 
-        # Sender name label (only for received messages)
         if not is_sent:
             name_label = QLabel(sender_name)
             name_label.setObjectName("sender_name")
             bubble_layout.addWidget(name_label)
 
-        # Message text
         text_label = QLabel(message_text)
         text_label.setWordWrap(True)
         text_label.setTextInteractionFlags(
@@ -183,7 +166,6 @@ class MessageBubble(QFrame):
 
         bubble_layout.addWidget(text_label)
 
-        # Timestamp
         time_label = QLabel(timestamp)
 
         if is_sent:
@@ -207,6 +189,7 @@ class ChatWindow(QWidget):
         self.username = username
         self.api_client = ApiClient()
         self.current_contact = None
+        self.last_displayed_date = None
 
         self.setWindowTitle("E2EE Messenger — " + self.username)
         self.setMinimumSize(800, 540)
@@ -214,8 +197,9 @@ class ChatWindow(QWidget):
 
         self.create_ui()
         self.prepare_user_keys()
+        self.load_existing_chats()
+        self.refresh_messages()
 
-        # Auto-refresh timer
         self.refresh_timer = QTimer(self)
         self.refresh_timer.timeout.connect(self.silent_refresh)
         self.refresh_timer.start(5000)
@@ -225,9 +209,6 @@ class ChatWindow(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # ==========================================
-        # LEFT SIDEBAR
-        # ==========================================
         sidebar = QFrame()
         sidebar.setObjectName("sidebar_frame")
         sidebar.setFixedWidth(240)
@@ -236,7 +217,6 @@ class ChatWindow(QWidget):
         sidebar_layout.setContentsMargins(0, 0, 0, 0)
         sidebar_layout.setSpacing(0)
 
-        # Sidebar header
         header_layout = QHBoxLayout()
         header_layout.setContentsMargins(14, 14, 14, 10)
 
@@ -245,16 +225,13 @@ class ChatWindow(QWidget):
         header_layout.addWidget(self.user_label)
 
         header_layout.addStretch()
-
         sidebar_layout.addLayout(header_layout)
 
-        # Separator
         sep = QFrame()
         sep.setObjectName("separator")
         sep.setFrameShape(QFrame.Shape.HLine)
         sidebar_layout.addWidget(sep)
 
-        # New chat input
         input_row = QHBoxLayout()
         input_row.setContentsMargins(10, 10, 10, 8)
         input_row.setSpacing(6)
@@ -275,17 +252,14 @@ class ChatWindow(QWidget):
 
         sidebar_layout.addLayout(input_row)
 
-        # Section label
         chats_label = QLabel("CHATS")
         chats_label.setObjectName("section_label")
         sidebar_layout.addWidget(chats_label)
 
-        # Contact list
         self.contact_list = QListWidget()
         self.contact_list.itemClicked.connect(self.on_contact_selected)
         sidebar_layout.addWidget(self.contact_list)
 
-        # Theme toggle at bottom of sidebar
         sidebar_bottom = QHBoxLayout()
         sidebar_bottom.setContentsMargins(10, 6, 10, 10)
 
@@ -297,20 +271,15 @@ class ChatWindow(QWidget):
         sidebar_bottom.addWidget(self.theme_button)
 
         sidebar_bottom.addStretch()
-
         sidebar_layout.addLayout(sidebar_bottom)
 
         sidebar.setLayout(sidebar_layout)
         main_layout.addWidget(sidebar)
 
-        # ==========================================
-        # RIGHT CHAT AREA
-        # ==========================================
         chat_panel = QVBoxLayout()
         chat_panel.setContentsMargins(0, 0, 0, 0)
         chat_panel.setSpacing(0)
 
-        # Chat header
         self.chat_header = QFrame()
         self.chat_header.setObjectName("chat_header_frame")
         self.chat_header.setFixedHeight(50)
@@ -335,7 +304,6 @@ class ChatWindow(QWidget):
         self.chat_header.setLayout(chat_header_layout)
         chat_panel.addWidget(self.chat_header)
 
-        # Message scroll area
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setHorizontalScrollBarPolicy(
@@ -351,7 +319,6 @@ class ChatWindow(QWidget):
         self.messages_container.setLayout(self.messages_layout)
         self.scroll_area.setWidget(self.messages_container)
 
-        # Empty state
         self.empty_label = QLabel("No conversation selected")
         self.empty_label.setObjectName("empty_chat_label")
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -360,7 +327,6 @@ class ChatWindow(QWidget):
         chat_panel.addWidget(self.scroll_area)
         self.scroll_area.hide()
 
-        # Input area
         self.input_frame = QFrame()
         self.input_frame.setObjectName("input_frame")
 
@@ -393,17 +359,9 @@ class ChatWindow(QWidget):
 
         self.setLayout(main_layout)
 
-    # ---------------------------------------------------------
-    # Theme toggle
-    # ---------------------------------------------------------
-
     def toggle_theme(self):
         theme_manager.toggle_theme()
         self.theme_button.setText(theme_manager.get_toggle_icon())
-
-    # ---------------------------------------------------------
-    # Security info
-    # ---------------------------------------------------------
 
     def show_security_info(self):
         dialog = SecurityInfoDialog(
@@ -414,9 +372,18 @@ class ChatWindow(QWidget):
         )
         dialog.exec()
 
-    # ---------------------------------------------------------
-    # Contact / conversation management
-    # ---------------------------------------------------------
+    def load_existing_chats(self):
+        contacts = load_existing_chat_contacts(self.username)
+
+        for contact_username in contacts:
+            item = QListWidgetItem(contact_username)
+            item.setData(Qt.ItemDataRole.UserRole, contact_username)
+            self.contact_list.addItem(item)
+
+        if len(contacts) > 0:
+            first_contact = contacts[0]
+            self.contact_list.setCurrentRow(0)
+            self.select_contact(first_contact)
 
     def start_new_chat(self):
         contact_username = self.contact_input.text().strip()
@@ -432,7 +399,6 @@ class ChatWindow(QWidget):
             )
             return
 
-        # Check if user exists on the server
         response = self.api_client.check_user_exists(contact_username)
 
         if not response.get("success"):
@@ -451,10 +417,11 @@ class ChatWindow(QWidget):
             )
             return
 
-        # Add to contact list if not there
         found = False
+
         for i in range(self.contact_list.count()):
             item = self.contact_list.item(i)
+
             if item.data(Qt.ItemDataRole.UserRole) == contact_username:
                 found = True
                 self.contact_list.setCurrentItem(item)
@@ -477,7 +444,6 @@ class ChatWindow(QWidget):
 
     def select_contact(self, contact_username):
         self.current_contact = contact_username
-
         self.chat_header_label.setText(contact_username)
 
         self.message_input.setEnabled(True)
@@ -488,10 +454,6 @@ class ChatWindow(QWidget):
         self.scroll_area.show()
 
         self.load_chat_history_for_contact(contact_username)
-
-    # ---------------------------------------------------------
-    # Key setup
-    # ---------------------------------------------------------
 
     def prepare_user_keys(self):
         key_data = load_user_keys(self.username)
@@ -510,10 +472,6 @@ class ChatWindow(QWidget):
                 response["message"]
             )
 
-    # ---------------------------------------------------------
-    # Helpers
-    # ---------------------------------------------------------
-
     def get_contact_username(self):
         if self.current_contact is None or self.current_contact == "":
             QMessageBox.warning(
@@ -527,10 +485,69 @@ class ChatWindow(QWidget):
 
     def get_current_time(self):
         return datetime.now().strftime("%H:%M")
+    
+    def get_current_datetime(self):
+        return datetime.now().isoformat()
 
-    def add_message_bubble(self, message_text, sender_name, is_sent, timestamp=None):
+    def format_message_time(self, created_at):
+        if created_at is None or created_at == "":
+            return self.get_current_time()
+
+        try:
+            parsed_date = datetime.fromisoformat(created_at)
+            return parsed_date.strftime("%H:%M")
+        except ValueError:
+            return created_at
+
+    def format_day_label(self, created_at):
+        if created_at is None or created_at == "":
+            message_date = date.today()
+        else:
+            try:
+                message_date = datetime.fromisoformat(created_at).date()
+            except ValueError:
+                message_date = date.today()
+
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+
+        if message_date == today:
+            return "Today"
+        elif message_date == yesterday:
+            return "Yesterday"
+
+        return message_date.strftime("%d %B %Y")
+
+    def add_date_separator(self, label_text):
+        label = QLabel(label_text)
+        label.setObjectName("date_separator_label")
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        wrapper = QWidget()
+        wrapper_layout = QHBoxLayout()
+        wrapper_layout.setContentsMargins(0, 8, 0, 8)
+
+        wrapper_layout.addStretch()
+        wrapper_layout.addWidget(label)
+        wrapper_layout.addStretch()
+
+        wrapper.setLayout(wrapper_layout)
+
+        count = self.messages_layout.count()
+        self.messages_layout.insertWidget(count - 1, wrapper)
+
+    def add_message_bubble(self, message_text, sender_name, is_sent, timestamp=None, created_at=None):
+        if created_at is None:
+            created_at = self.get_current_datetime()
+
+        day_label = self.format_day_label(created_at)
+
+        if day_label != self.last_displayed_date:
+            self.add_date_separator(day_label)
+            self.last_displayed_date = day_label
+
         if timestamp is None:
-            timestamp = self.get_current_time()
+            timestamp = self.format_message_time(created_at)
 
         bubble = MessageBubble(
             message_text,
@@ -559,6 +576,8 @@ class ChatWindow(QWidget):
         scrollbar.setValue(scrollbar.maximum())
 
     def clear_messages(self):
+        self.last_displayed_date = None
+
         while self.messages_layout.count() > 1:
             item = self.messages_layout.takeAt(0)
 
@@ -575,10 +594,6 @@ class ChatWindow(QWidget):
                 item.widget().deleteLater()
             elif item.layout():
                 self.clear_layout(item.layout())
-
-    # ---------------------------------------------------------
-    # Session handling
-    # ---------------------------------------------------------
 
     def get_or_create_sender_session(self, contact_username):
         session_data = load_session(self.username, contact_username)
@@ -602,7 +617,6 @@ class ChatWindow(QWidget):
             session_data = create_sender_session_from_bundle(receiver_bundle)
             save_session(self.username, contact_username, session_data)
             return session_data
-
         except Exception as error:
             QMessageBox.warning(
                 self,
@@ -641,7 +655,6 @@ class ChatWindow(QWidget):
                 save_user_keys(self.username, key_data)
 
             return session_data
-
         except Exception as error:
             QMessageBox.warning(
                 self,
@@ -649,10 +662,6 @@ class ChatWindow(QWidget):
                 "Could not create receiver session: " + str(error)
             )
             return None
-
-    # ---------------------------------------------------------
-    # Sending messages
-    # ---------------------------------------------------------
 
     def send_message(self):
         contact_username = self.get_contact_username()
@@ -687,14 +696,24 @@ class ChatWindow(QWidget):
             response = self.api_client.send_message(packet)
 
             if response["success"]:
-                self.add_message_bubble(message, self.username, True)
+                created_at = self.get_current_datetime()
+                timestamp = self.format_message_time(created_at)
+
+                self.add_message_bubble(
+                    message,
+                    self.username,
+                    True,
+                    timestamp,
+                    created_at
+                )
 
                 history_data = {
                     "direction": "sent",
                     "sender": self.username,
                     "receiver": contact_username,
                     "message": message,
-                    "timestamp": self.get_current_time()
+                    "timestamp": timestamp,
+                    "created_at": created_at
                 }
 
                 save_message_to_history(
@@ -704,24 +723,18 @@ class ChatWindow(QWidget):
                 )
 
                 self.message_input.clear()
-
             else:
                 QMessageBox.warning(
                     self,
                     "Send Failed",
                     response["message"]
                 )
-
         except Exception as error:
             QMessageBox.warning(
                 self,
                 "Encryption Error",
                 "Could not encrypt or send message: " + str(error)
             )
-
-    # ---------------------------------------------------------
-    # Receiving messages
-    # ---------------------------------------------------------
 
     def refresh_messages(self):
         response = self.api_client.get_messages(self.username)
@@ -753,7 +766,6 @@ class ChatWindow(QWidget):
 
             for packet in messages:
                 self.handle_incoming_packet(packet)
-
         except Exception:
             pass
 
@@ -774,12 +786,13 @@ class ChatWindow(QWidget):
                 packet
             )
 
-            timestamp = self.get_current_time()
-
-            # Add sender to contact list if not there
+            created_at = packet.get("created_at", self.get_current_datetime())
+            timestamp = self.format_message_time(created_at)
             found = False
+
             for i in range(self.contact_list.count()):
                 item = self.contact_list.item(i)
+
                 if item.data(Qt.ItemDataRole.UserRole) == sender_username:
                     found = True
                     break
@@ -789,13 +802,13 @@ class ChatWindow(QWidget):
                 item.setData(Qt.ItemDataRole.UserRole, sender_username)
                 self.contact_list.addItem(item)
 
-            # Show bubble if viewing this contact
             if self.current_contact == sender_username:
                 self.add_message_bubble(
                     plaintext,
                     sender_username,
                     False,
-                    timestamp
+                    timestamp,
+                    created_at
                 )
 
             history_data = {
@@ -803,7 +816,8 @@ class ChatWindow(QWidget):
                 "sender": sender_username,
                 "receiver": self.username,
                 "message": plaintext,
-                "timestamp": timestamp
+                "timestamp": timestamp,
+                "created_at": created_at
             }
 
             save_message_to_history(
@@ -811,7 +825,6 @@ class ChatWindow(QWidget):
                 sender_username,
                 history_data
             )
-
         except Exception as error:
             QMessageBox.warning(
                 self,
@@ -819,23 +832,27 @@ class ChatWindow(QWidget):
                 "Could not decrypt message: " + str(error)
             )
 
-    # ---------------------------------------------------------
-    # Chat history
-    # ---------------------------------------------------------
-
     def load_chat_history_for_contact(self, contact_username):
         self.clear_messages()
-
         history = load_chat_history(self.username, contact_username)
 
         for item in history:
             is_sent = item["direction"] == "sent"
             sender_name = "Me" if is_sent else item["sender"]
+
+            created_at = item.get("created_at")
             timestamp = item.get("timestamp", "")
+
+            if created_at is None:
+                created_at = self.get_current_datetime()
+
+            if timestamp == "":
+                timestamp = self.format_message_time(created_at)
 
             self.add_message_bubble(
                 item["message"],
                 sender_name,
                 is_sent,
-                timestamp
+                timestamp,
+                created_at
             )

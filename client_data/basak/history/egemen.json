@@ -1,0 +1,50 @@
+[
+    {
+        "direction": "sent",
+        "sender": "basak",
+        "receiver": "egemen",
+        "message": "naber",
+        "timestamp": "22:09",
+        "created_at": "2026-05-31T22:09:00"
+    },
+    {
+        "direction": "received",
+        "sender": "egemen",
+        "receiver": "basak",
+        "message": "iyi sen",
+        "timestamp": "22:10",
+        "created_at": "2026-05-31T22:09:00"
+    },
+    {
+        "direction": "received",
+        "sender": "egemen",
+        "receiver": "basak",
+        "message": "naber",
+        "timestamp": "23:40",
+        "created_at": "2026-05-31T23:40:20.055074"
+    },
+    {
+        "direction": "sent",
+        "sender": "basak",
+        "receiver": "egemen",
+        "message": "iyi sen",
+        "timestamp": "23:53",
+        "created_at": "2026-05-31T23:53:30.018950"
+    },
+    {
+        "direction": "received",
+        "sender": "egemen",
+        "receiver": "basak",
+        "message": "iyi ben de",
+        "timestamp": "23:53",
+        "created_at": "2026-05-31T23:53:43.911733"
+    },
+    {
+        "direction": "sent",
+        "sender": "basak",
+        "receiver": "egemen",
+        "message": "okey",
+        "timestamp": "23:57",
+        "created_at": "2026-05-31T23:57:38.458449"
+    }
+]

@@ -15,10 +15,9 @@ from database import (
     add_user,
     user_exists,
     verify_user,
-    get_user_info,
-    save_key_bundle,
     get_key_bundle,
     get_key_bundle_info,
+    save_key_bundle,
     remove_one_time_prekey,
     save_message,
     get_messages_for_user,
@@ -45,10 +44,6 @@ def start_server():
     create_tables()
 
 
-# ---------------------------------------------------------
-# Auth endpoints
-# ---------------------------------------------------------
-
 @app.post("/register")
 def register_user(request: RegisterRequest):
     username = request.username.strip()
@@ -66,9 +61,9 @@ def register_user(request: RegisterRequest):
             "message": "Username already exists."
         }
 
-    created = add_user(username, password)
+    is_created = add_user(username, password)
 
-    if created:
+    if is_created:
         return {
             "success": True,
             "message": "User registered successfully."
@@ -85,7 +80,9 @@ def login_user(request: LoginRequest):
     username = request.username.strip()
     password = request.password
 
-    if verify_user(username, password):
+    is_valid_user = verify_user(username, password)
+
+    if is_valid_user:
         return {
             "success": True,
             "message": "Login successful."
@@ -97,10 +94,6 @@ def login_user(request: LoginRequest):
     }
 
 
-# ---------------------------------------------------------
-# Key bundle endpoints
-# ---------------------------------------------------------
-
 @app.post("/upload_keys")
 def upload_keys(request: KeyBundleRequest):
     if not user_exists(request.username):
@@ -109,14 +102,15 @@ def upload_keys(request: KeyBundleRequest):
             "message": "User does not exist."
         }
 
-    # Convert Pydantic objects to plain dicts for JSON storage
     one_time_prekeys = []
 
     for prekey in request.one_time_prekeys:
-        one_time_prekeys.append({
+        prekey_data = {
             "id": prekey.id,
             "public_key": prekey.public_key
-        })
+        }
+
+        one_time_prekeys.append(prekey_data)
 
     normalized_bundle = SimpleNamespace(
         username=request.username,
@@ -150,8 +144,6 @@ def get_keys(username: str):
             "message": "Key bundle not found."
         }
 
-    # Serve one OTK to the requesting client, then remove it
-    # so each one-time prekey is used only once.
     one_time_prekeys = key_bundle.get("one_time_prekeys", [])
 
     if len(one_time_prekeys) > 0:
@@ -174,21 +166,15 @@ def get_keys(username: str):
 
 @app.get("/keys/{username}/info")
 def get_keys_info(username: str):
-    """
-    Return key bundle metadata for a user.
-    This endpoint shows key types and public key fingerprints
-    without exposing the full key material needed for key exchange.
-    Used by the client to display security info in the UI.
-    """
     if not user_exists(username):
         return {
             "success": False,
             "message": "User does not exist."
         }
 
-    info = get_key_bundle_info(username)
+    key_info = get_key_bundle_info(username)
 
-    if info is None:
+    if key_info is None:
         return {
             "success": False,
             "message": "Key bundle not found."
@@ -196,13 +182,9 @@ def get_keys_info(username: str):
 
     return {
         "success": True,
-        "key_info": info
+        "key_info": key_info
     }
 
-
-# ---------------------------------------------------------
-# Message endpoints
-# ---------------------------------------------------------
 
 @app.post("/send_message")
 def send_encrypted_message(request: EncryptedMessageRequest):
@@ -237,9 +219,6 @@ def get_user_messages(username: str):
 
     messages = get_messages_for_user(username)
 
-    # Delete messages from server after delivery.
-    # The server never stores plaintext and discards
-    # ciphertext once the recipient fetches it.
     delete_messages_for_user(username)
 
     return {
@@ -248,10 +227,6 @@ def get_user_messages(username: str):
         "messages": messages
     }
 
-
-# ---------------------------------------------------------
-# Server info / health check
-# ---------------------------------------------------------
 
 @app.get("/")
 def home():
@@ -263,7 +238,6 @@ def home():
 
 @app.get("/user/{username}/exists")
 def check_user(username: str):
-    """Check if a user exists on the server."""
     if user_exists(username):
         return {
             "success": True,
@@ -280,9 +254,10 @@ def check_user(username: str):
 
 @app.get("/stats")
 def server_stats():
-    """Return basic server statistics."""
-    return {
+    stats = {
         "success": True,
         "registered_users": get_user_count(),
         "pending_messages": get_message_count()
     }
+
+    return stats

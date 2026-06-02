@@ -8,10 +8,6 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 
-# ---------------------------------------------------------
-# Helper functions
-# ---------------------------------------------------------
-
 def bytes_to_string(data):
     return base64.b64encode(data).decode("utf-8")
 
@@ -24,58 +20,29 @@ def make_random_id(prefix):
     return prefix + "_" + str(uuid.uuid4())
 
 
-# ---------------------------------------------------------
-# Key generation
-# ---------------------------------------------------------
-
 def generate_identity_key_pair():
     private_key = ed25519.Ed25519PrivateKey.generate()
     public_key = private_key.public_key()
-
     return private_key, public_key
 
 
 def generate_signed_prekey_pair():
     private_key = x25519.X25519PrivateKey.generate()
     public_key = private_key.public_key()
-
     return private_key, public_key
 
 
 def generate_one_time_prekey_pair():
     private_key = x25519.X25519PrivateKey.generate()
     public_key = private_key.public_key()
-
     return private_key, public_key
 
-
-def generate_one_time_prekeys(count=10):
-    one_time_prekeys = []
-
-    for i in range(count):
-        private_key, public_key = generate_one_time_prekey_pair()
-
-        prekey_data = {
-            "id": make_random_id("otk"),
-            "private_key": export_private_key(private_key),
-            "public_key": export_public_key(public_key)
-        }
-
-        one_time_prekeys.append(prekey_data)
-
-    return one_time_prekeys
-
-
-# ---------------------------------------------------------
-# Export / import functions
-# ---------------------------------------------------------
 
 def export_public_key(public_key):
     key_bytes = public_key.public_bytes(
         encoding=serialization.Encoding.Raw,
         format=serialization.PublicFormat.Raw
     )
-
     return bytes_to_string(key_bytes)
 
 
@@ -85,12 +52,11 @@ def export_private_key(private_key):
         format=serialization.PrivateFormat.Raw,
         encryption_algorithm=serialization.NoEncryption()
     )
-
     return bytes_to_string(key_bytes)
 
 
-def import_public_key(string_public_key, key_type):
-    key_bytes = string_to_bytes(string_public_key)
+def import_public_key(public_key_text, key_type):
+    key_bytes = string_to_bytes(public_key_text)
 
     if key_type == "ed25519":
         return ed25519.Ed25519PublicKey.from_public_bytes(key_bytes)
@@ -101,8 +67,8 @@ def import_public_key(string_public_key, key_type):
     raise ValueError("Unknown public key type")
 
 
-def import_private_key(string_private_key, key_type):
-    key_bytes = string_to_bytes(string_private_key)
+def import_private_key(private_key_text, key_type):
+    key_bytes = string_to_bytes(private_key_text)
 
     if key_type == "ed25519":
         return ed25519.Ed25519PrivateKey.from_private_bytes(key_bytes)
@@ -113,23 +79,32 @@ def import_private_key(string_private_key, key_type):
     raise ValueError("Unknown private key type")
 
 
-# ---------------------------------------------------------
-# Signed prekey signature
-# ---------------------------------------------------------
+def generate_one_time_prekeys(count=10):
+    prekeys = []
+
+    for i in range(count):
+        private_key, public_key = generate_one_time_prekey_pair()
+
+        prekeys.append({
+            "id": make_random_id("otk"),
+            "private_key": export_private_key(private_key),
+            "public_key": export_public_key(public_key)
+        })
+
+    return prekeys
+
 
 def sign_prekey(identity_private_key, signed_prekey_public_key):
-    signed_prekey_string = export_public_key(signed_prekey_public_key)
-    message = signed_prekey_string.encode("utf-8")
-
+    public_key_text = export_public_key(signed_prekey_public_key)
+    message = public_key_text.encode("utf-8")
     signature = identity_private_key.sign(message)
-
     return bytes_to_string(signature)
 
 
-def verify_prekey_signature(identity_public_key, signed_prekey_public_key, signature_string):
-    signed_prekey_string = export_public_key(signed_prekey_public_key)
-    message = signed_prekey_string.encode("utf-8")
-    signature = string_to_bytes(signature_string)
+def verify_prekey_signature(identity_public_key, signed_prekey_public_key, signature_text):
+    public_key_text = export_public_key(signed_prekey_public_key)
+    message = public_key_text.encode("utf-8")
+    signature = string_to_bytes(signature_text)
 
     try:
         identity_public_key.verify(signature, message)
@@ -137,10 +112,6 @@ def verify_prekey_signature(identity_public_key, signed_prekey_public_key, signa
     except Exception:
         return False
 
-
-# ---------------------------------------------------------
-# User key data
-# ---------------------------------------------------------
 
 def create_user_key_data(username, one_time_prekey_count=10):
     identity_private_key, identity_public_key = generate_identity_key_pair()
@@ -153,7 +124,7 @@ def create_user_key_data(username, one_time_prekey_count=10):
 
     one_time_prekeys = generate_one_time_prekeys(one_time_prekey_count)
 
-    key_data = {
+    return {
         "username": username,
 
         "identity_key_type": "ed25519",
@@ -169,8 +140,6 @@ def create_user_key_data(username, one_time_prekey_count=10):
         "one_time_prekeys": one_time_prekeys
     }
 
-    return key_data
-
 
 def create_public_key_bundle(key_data):
     public_one_time_prekeys = []
@@ -181,7 +150,7 @@ def create_public_key_bundle(key_data):
             "public_key": prekey["public_key"]
         })
 
-    bundle = {
+    return {
         "username": key_data["username"],
 
         "identity_key_type": "ed25519",
@@ -194,8 +163,6 @@ def create_public_key_bundle(key_data):
         "one_time_prekey_type": "x25519",
         "one_time_prekeys": public_one_time_prekeys
     }
-
-    return bundle
 
 
 def validate_public_key_bundle(bundle):
@@ -210,21 +177,15 @@ def validate_public_key_bundle(bundle):
             "x25519"
         )
 
-        signature = bundle["signed_prekey_signature"]
-
         return verify_prekey_signature(
             identity_public_key,
             signed_prekey_public_key,
-            signature
+            bundle["signed_prekey_signature"]
         )
 
     except Exception:
         return False
 
-
-# ---------------------------------------------------------
-# One-time prekey helpers
-# ---------------------------------------------------------
 
 def get_first_one_time_prekey_from_bundle(bundle):
     one_time_prekeys = bundle.get("one_time_prekeys", [])
@@ -244,28 +205,25 @@ def find_one_time_private_key(key_data, one_time_prekey_id):
 
 
 def remove_used_one_time_prekey(key_data, one_time_prekey_id):
-    new_prekey_list = []
+    remaining_prekeys = []
 
     for prekey in key_data["one_time_prekeys"]:
         if prekey["id"] != one_time_prekey_id:
-            new_prekey_list.append(prekey)
+            remaining_prekeys.append(prekey)
 
-    key_data["one_time_prekeys"] = new_prekey_list
-
+    key_data["one_time_prekeys"] = remaining_prekeys
     return key_data
 
 
-# ---------------------------------------------------------
-# Session key derivation
-# ---------------------------------------------------------
-
-def hkdf_derive_key(input_key_material, info_text, length=32):
-    return HKDF(
+def hkdf_derive_key(input_data, info_text, length=32):
+    hkdf = HKDF(
         algorithm=hashes.SHA256(),
         length=length,
         salt=None,
         info=info_text.encode("utf-8")
-    ).derive(input_key_material)
+    )
+
+    return hkdf.derive(input_data)
 
 
 def derive_sender_session_key(
@@ -273,23 +231,23 @@ def derive_sender_session_key(
     receiver_signed_prekey_public_key,
     receiver_one_time_prekey_public_key=None
 ):
-    dh_outputs = []
+    shared_secrets = []
 
-    dh1 = sender_ephemeral_private_key.exchange(receiver_signed_prekey_public_key)
-    dh_outputs.append(dh1)
+    shared_secrets.append(
+        sender_ephemeral_private_key.exchange(receiver_signed_prekey_public_key)
+    )
 
     if receiver_one_time_prekey_public_key is not None:
-        dh2 = sender_ephemeral_private_key.exchange(receiver_one_time_prekey_public_key)
-        dh_outputs.append(dh2)
+        shared_secrets.append(
+            sender_ephemeral_private_key.exchange(receiver_one_time_prekey_public_key)
+        )
 
-    combined_secret = b"".join(dh_outputs)
+    combined_secret = b"".join(shared_secrets)
 
-    session_key = hkdf_derive_key(
+    return hkdf_derive_key(
         combined_secret,
         "simple-signal-inspired-session-key"
     )
-
-    return session_key
 
 
 def derive_receiver_session_key(
@@ -297,23 +255,23 @@ def derive_receiver_session_key(
     sender_ephemeral_public_key,
     receiver_one_time_prekey_private_key=None
 ):
-    dh_outputs = []
+    shared_secrets = []
 
-    dh1 = receiver_signed_prekey_private_key.exchange(sender_ephemeral_public_key)
-    dh_outputs.append(dh1)
+    shared_secrets.append(
+        receiver_signed_prekey_private_key.exchange(sender_ephemeral_public_key)
+    )
 
     if receiver_one_time_prekey_private_key is not None:
-        dh2 = receiver_one_time_prekey_private_key.exchange(sender_ephemeral_public_key)
-        dh_outputs.append(dh2)
+        shared_secrets.append(
+            receiver_one_time_prekey_private_key.exchange(sender_ephemeral_public_key)
+        )
 
-    combined_secret = b"".join(dh_outputs)
+    combined_secret = b"".join(shared_secrets)
 
-    session_key = hkdf_derive_key(
+    return hkdf_derive_key(
         combined_secret,
         "simple-signal-inspired-session-key"
     )
-
-    return session_key
 
 
 def create_sender_session_from_bundle(receiver_bundle):
@@ -328,18 +286,16 @@ def create_sender_session_from_bundle(receiver_bundle):
         "x25519"
     )
 
-    selected_one_time_prekey = get_first_one_time_prekey_from_bundle(receiver_bundle)
-
+    selected_prekey = get_first_one_time_prekey_from_bundle(receiver_bundle)
     receiver_one_time_prekey_public_key = None
     used_one_time_prekey_id = None
 
-    if selected_one_time_prekey is not None:
+    if selected_prekey is not None:
         receiver_one_time_prekey_public_key = import_public_key(
-            selected_one_time_prekey["public_key"],
+            selected_prekey["public_key"],
             "x25519"
         )
-
-        used_one_time_prekey_id = selected_one_time_prekey["id"]
+        used_one_time_prekey_id = selected_prekey["id"]
 
     session_key = derive_sender_session_key(
         sender_ephemeral_private_key,
@@ -347,14 +303,12 @@ def create_sender_session_from_bundle(receiver_bundle):
         receiver_one_time_prekey_public_key
     )
 
-    session_data = {
+    return {
         "session_key": bytes_to_string(session_key),
         "sender_ephemeral_public_key": export_public_key(sender_ephemeral_public_key),
         "used_one_time_prekey_id": used_one_time_prekey_id,
         "message_counter": 0
     }
-
-    return session_data
 
 
 def create_receiver_session_from_packet(receiver_key_data, packet):
@@ -372,14 +326,14 @@ def create_receiver_session_from_packet(receiver_key_data, packet):
     receiver_one_time_prekey_private_key = None
 
     if used_one_time_prekey_id is not None:
-        one_time_private_key_string = find_one_time_private_key(
+        private_key_text = find_one_time_private_key(
             receiver_key_data,
             used_one_time_prekey_id
         )
 
-        if one_time_private_key_string is not None:
+        if private_key_text is not None:
             receiver_one_time_prekey_private_key = import_private_key(
-                one_time_private_key_string,
+                private_key_text,
                 "x25519"
             )
 
@@ -389,49 +343,36 @@ def create_receiver_session_from_packet(receiver_key_data, packet):
         receiver_one_time_prekey_private_key
     )
 
-    session_data = {
+    return {
         "session_key": bytes_to_string(session_key),
         "sender_ephemeral_public_key": packet["sender_ephemeral_public_key"],
         "used_one_time_prekey_id": used_one_time_prekey_id,
         "message_counter": 0
     }
 
-    return session_data
 
-
-# ---------------------------------------------------------
-# Per-message key derivation
-# ---------------------------------------------------------
-
-def derive_message_key(session_key_string, message_number):
-    session_key = string_to_bytes(session_key_string)
-
+def derive_message_key(session_key_text, message_number):
+    session_key = string_to_bytes(session_key_text)
     info_text = "message-key-" + str(message_number)
 
-    message_key = hkdf_derive_key(
+    return hkdf_derive_key(
         session_key,
         info_text
     )
 
-    return message_key
-
-
-# ---------------------------------------------------------
-# Message encryption / decryption
-# ---------------------------------------------------------
 
 def create_associated_data(sender_username, receiver_username, message_number):
-    text = sender_username + "|" + receiver_username + "|" + str(message_number)
-    return text.encode("utf-8")
+    data_text = sender_username + "|" + receiver_username + "|" + str(message_number)
+    return data_text.encode("utf-8")
 
 
-def encrypt_message(session_key_string, message, message_number, sender_username, receiver_username):
-    message_key = derive_message_key(session_key_string, message_number)
-
+def encrypt_message(session_key_text, message, message_number, sender_username, receiver_username):
+    message_key = derive_message_key(session_key_text, message_number)
     aesgcm = AESGCM(message_key)
-    nonce = os.urandom(12)
 
+    nonce = os.urandom(12)
     message_bytes = message.encode("utf-8")
+
     associated_data = create_associated_data(
         sender_username,
         receiver_username,
@@ -444,17 +385,14 @@ def encrypt_message(session_key_string, message, message_number, sender_username
         associated_data
     )
 
-    encrypted_data = {
+    return {
         "nonce": bytes_to_string(nonce),
         "ciphertext": bytes_to_string(ciphertext)
     }
 
-    return encrypted_data
 
-
-def decrypt_message(session_key_string, encrypted_data, message_number, sender_username, receiver_username):
-    message_key = derive_message_key(session_key_string, message_number)
-
+def decrypt_message(session_key_text, encrypted_data, message_number, sender_username, receiver_username):
+    message_key = derive_message_key(session_key_text, message_number)
     aesgcm = AESGCM(message_key)
 
     nonce = string_to_bytes(encrypted_data["nonce"])
@@ -474,10 +412,6 @@ def decrypt_message(session_key_string, encrypted_data, message_number, sender_u
 
     return plaintext.decode("utf-8")
 
-
-# ---------------------------------------------------------
-# Message packet functions
-# ---------------------------------------------------------
 
 def create_encrypted_message_packet(
     sender_username,
@@ -519,12 +453,10 @@ def decrypt_encrypted_message_packet(session_data, packet):
         "ciphertext": packet["ciphertext"]
     }
 
-    message = decrypt_message(
+    return decrypt_message(
         session_data["session_key"],
         encrypted_data,
         packet["message_number"],
         packet["sender"],
         packet["receiver"]
     )
-
-    return message

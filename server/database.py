@@ -11,6 +11,7 @@ DATABASE_NAME = "server_database.db"
 def get_connection():
     connection = sqlite3.connect(DATABASE_NAME)
     connection.row_factory = sqlite3.Row
+
     return connection
 
 
@@ -57,7 +58,6 @@ def create_tables():
         )
     """)
 
-    # Indexes for faster lookups
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_users_username
         ON users(username)
@@ -82,32 +82,28 @@ def create_tables():
     connection.close()
 
 
-# ---------------------------------------------------------
-# Password helpers (salted SHA-256)
-# ---------------------------------------------------------
-
 def generate_salt():
-    """Generate a random 16-byte salt as hex string."""
-    return os.urandom(16).hex()
+    salt = os.urandom(16).hex()
+
+    return salt
 
 
 def hash_password(password, salt):
-    """Hash password with salt using SHA-256."""
-    salted = salt + password
-    password_bytes = salted.encode("utf-8")
-    hashed_password = hashlib.sha256(password_bytes).hexdigest()
+    salted_password = salt + password
+    password_bytes = salted_password.encode("utf-8")
+    password_hash = hashlib.sha256(password_bytes).hexdigest()
 
-    return hashed_password
+    return password_hash
 
 
 def check_password(password, salt, password_hash):
-    """Verify password against stored salt and hash."""
-    return hash_password(password, salt) == password_hash
+    new_hash = hash_password(password, salt)
 
+    if new_hash == password_hash:
+        return True
 
-# ---------------------------------------------------------
-# User functions
-# ---------------------------------------------------------
+    return False
+
 
 def add_user(username, password):
     connection = get_connection()
@@ -130,6 +126,7 @@ def add_user(username, password):
 
     except sqlite3.IntegrityError:
         connection.close()
+
         return False
 
 
@@ -143,9 +140,13 @@ def user_exists(username):
     """, (username,))
 
     user = cursor.fetchone()
+
     connection.close()
 
-    return user is not None
+    if user is None:
+        return False
+
+    return True
 
 
 def verify_user(username, password):
@@ -158,16 +159,22 @@ def verify_user(username, password):
     """, (username,))
 
     user = cursor.fetchone()
+
     connection.close()
 
     if user is None:
         return False
 
-    return check_password(password, user["salt"], user["password_hash"])
+    is_correct = check_password(
+        password,
+        user["salt"],
+        user["password_hash"]
+    )
+
+    return is_correct
 
 
 def get_user_info(username):
-    """Return basic user info (for admin/debug purposes)."""
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -177,20 +184,19 @@ def get_user_info(username):
     """, (username,))
 
     user = cursor.fetchone()
+
     connection.close()
 
     if user is None:
         return None
 
-    return {
+    user_info = {
         "username": user["username"],
         "created_at": user["created_at"]
     }
 
+    return user_info
 
-# ---------------------------------------------------------
-# Key bundle functions
-# ---------------------------------------------------------
 
 def save_key_bundle(key_bundle):
     connection = get_connection()
@@ -238,6 +244,7 @@ def get_key_bundle(username):
     """, (username,))
 
     row = cursor.fetchone()
+
     connection.close()
 
     if row is None:
@@ -247,14 +254,11 @@ def get_key_bundle(username):
 
     key_bundle = {
         "username": row["username"],
-
         "identity_key_type": row["identity_key_type"],
         "identity_public_key": row["identity_public_key"],
-
         "signed_prekey_type": row["signed_prekey_type"],
         "signed_prekey_public_key": row["signed_prekey_public_key"],
         "signed_prekey_signature": row["signed_prekey_signature"],
-
         "one_time_prekey_type": row["one_time_prekey_type"],
         "one_time_prekeys": one_time_prekeys
     }
@@ -263,10 +267,6 @@ def get_key_bundle(username):
 
 
 def get_key_bundle_info(username):
-    """
-    Return key bundle metadata for display purposes.
-    Shows key types, truncated public keys, and OTK count.
-    """
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -279,6 +279,7 @@ def get_key_bundle_info(username):
     """, (username,))
 
     row = cursor.fetchone()
+
     connection.close()
 
     if row is None:
@@ -286,7 +287,7 @@ def get_key_bundle_info(username):
 
     one_time_prekeys = json.loads(row["one_time_prekeys"])
 
-    return {
+    key_bundle_info = {
         "identity_key_type": row["identity_key_type"],
         "identity_public_key": row["identity_public_key"],
         "signed_prekey_type": row["signed_prekey_type"],
@@ -294,6 +295,8 @@ def get_key_bundle_info(username):
         "one_time_prekeys_remaining": len(one_time_prekeys),
         "updated_at": row["updated_at"]
     }
+
+    return key_bundle_info
 
 
 def remove_one_time_prekey(username, one_time_prekey_id):
@@ -327,15 +330,11 @@ def remove_one_time_prekey(username, one_time_prekey_id):
     return True
 
 
-# ---------------------------------------------------------
-# Message functions
-# ---------------------------------------------------------
-
 def save_message(message):
     connection = get_connection()
     cursor = connection.cursor()
 
-    created_at = datetime.utcnow().isoformat()
+    created_at = datetime.now().isoformat()
 
     cursor.execute("""
         INSERT INTO messages (
@@ -375,6 +374,7 @@ def get_messages_for_user(username):
     """, (username,))
 
     rows = cursor.fetchall()
+
     connection.close()
 
     messages = []
@@ -410,26 +410,30 @@ def delete_messages_for_user(username):
 
 
 def get_message_count():
-    """Return total message count stored on server (for stats)."""
     connection = get_connection()
     cursor = connection.cursor()
 
-    cursor.execute("SELECT COUNT(*) as count FROM messages")
+    cursor.execute("""
+        SELECT COUNT(*) as count FROM messages
+    """)
 
     row = cursor.fetchone()
+
     connection.close()
 
     return row["count"]
 
 
 def get_user_count():
-    """Return total registered user count (for stats)."""
     connection = get_connection()
     cursor = connection.cursor()
 
-    cursor.execute("SELECT COUNT(*) as count FROM users")
+    cursor.execute("""
+        SELECT COUNT(*) as count FROM users
+    """)
 
     row = cursor.fetchone()
+
     connection.close()
 
     return row["count"]

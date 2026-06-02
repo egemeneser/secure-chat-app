@@ -7,8 +7,10 @@ CURRENT_USER_FILE = os.path.join(DATA_FOLDER, "current_user.json")
 
 
 def create_data_folder():
-    if not os.path.exists(DATA_FOLDER):
-        os.makedirs(DATA_FOLDER)
+    if os.path.exists(DATA_FOLDER):
+        return
+
+    os.makedirs(DATA_FOLDER)
 
 
 def get_user_folder(username):
@@ -37,10 +39,10 @@ def load_json_file(file_path):
         return None
 
     with open(file_path, "r") as file:
-        return json.load(file)
+        data = json.load(file)
 
+    return data
 
-# current user
 
 def save_current_user(username):
     create_data_folder()
@@ -58,15 +60,16 @@ def load_current_user():
     if data is None:
         return None
 
-    return data.get("username")
+    username = data.get("username")
+    return username
 
 
 def clear_current_user():
-    if os.path.exists(CURRENT_USER_FILE):
-        os.remove(CURRENT_USER_FILE)
+    if not os.path.exists(CURRENT_USER_FILE):
+        return
 
+    os.remove(CURRENT_USER_FILE)
 
-# local key storage
 
 def save_user_keys(username, key_data):
     user_folder = get_user_folder(username)
@@ -79,10 +82,9 @@ def load_user_keys(username):
     user_folder = get_user_folder(username)
     file_path = os.path.join(user_folder, "keys.json")
 
-    return load_json_file(file_path)
+    key_data = load_json_file(file_path)
+    return key_data
 
-
-# session storage
 
 def save_session(username, contact_username, session_data):
     user_folder = get_user_folder(username)
@@ -98,18 +100,24 @@ def save_session(username, contact_username, session_data):
 
 def load_session(username, contact_username):
     user_folder = get_user_folder(username)
-    file_path = os.path.join(user_folder, "sessions", f"{contact_username}.json")
+    file_path = os.path.join(
+        user_folder,
+        "sessions",
+        f"{contact_username}.json"
+    )
 
-    return load_json_file(file_path)
+    session_data = load_json_file(file_path)
+    return session_data
 
 
 def session_exists(username, contact_username):
     session_data = load_session(username, contact_username)
 
-    return session_data is not None
+    if session_data is None:
+        return False
 
+    return True
 
-# message counter storage
 
 def get_message_counter(username, contact_username):
     session_data = load_session(username, contact_username)
@@ -117,7 +125,8 @@ def get_message_counter(username, contact_username):
     if session_data is None:
         return 0
 
-    return session_data.get("message_counter", 0)
+    counter = session_data.get("message_counter", 0)
+    return counter
 
 
 def increase_message_counter(username, contact_username):
@@ -129,14 +138,14 @@ def increase_message_counter(username, contact_username):
         }
 
     current_counter = session_data.get("message_counter", 0)
-    session_data["message_counter"] = current_counter + 1
+    new_counter = current_counter + 1
+
+    session_data["message_counter"] = new_counter
 
     save_session(username, contact_username, session_data)
 
-    return session_data["message_counter"]
+    return new_counter
 
-
-# chat history storage
 
 def save_message_to_history(username, contact_username, message_data):
     user_folder = get_user_folder(username)
@@ -159,7 +168,11 @@ def save_message_to_history(username, contact_username, message_data):
 
 def load_chat_history(username, contact_username):
     user_folder = get_user_folder(username)
-    file_path = os.path.join(user_folder, "history", f"{contact_username}.json")
+    file_path = os.path.join(
+        user_folder,
+        "history",
+        f"{contact_username}.json"
+    )
 
     history = load_json_file(file_path)
 
@@ -167,3 +180,22 @@ def load_chat_history(username, contact_username):
         return []
 
     return history
+
+
+def load_existing_chat_contacts(username):
+    user_folder = get_user_folder(username)
+    history_folder = os.path.join(user_folder, "history")
+
+    if not os.path.exists(history_folder):
+        return []
+
+    contacts = []
+
+    for file_name in os.listdir(history_folder):
+        if file_name.endswith(".json"):
+            contact_username = file_name.replace(".json", "")
+            contacts.append(contact_username)
+
+    contacts.sort()
+
+    return contacts

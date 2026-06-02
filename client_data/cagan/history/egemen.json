@@ -1,0 +1,26 @@
+[
+    {
+        "direction": "received",
+        "sender": "egemen",
+        "receiver": "cagan",
+        "message": "naber",
+        "timestamp": "21:33",
+        "created_at": "2026-05-31T22:09:00"
+    },
+    {
+        "direction": "sent",
+        "sender": "cagan",
+        "receiver": "egemen",
+        "message": "iyi sen",
+        "timestamp": "21:33",
+        "created_at": "2026-05-31T22:09:00"
+    },
+    {
+        "direction": "received",
+        "sender": "egemen",
+        "receiver": "cagan",
+        "message": "iyiyim ben de",
+        "timestamp": "21:33",
+        "created_at": "2026-05-31T22:09:00"
+    }
+]
